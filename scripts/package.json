@@ -1,0 +1,25 @@
+{
+  "name": "crosschain-swap-scripts",
+  "version": "1.0.0",
+  "description": "Sample scripts for ETH to Stellar cross-chain swaps",
+  "main": "index.js",
+  "scripts": {
+    "eth-to-stellar": "ts-node scripts/eth-to-stellar.ts",
+    "stellar-to-eth": "ts-node scripts/stellar-to-eth.ts",
+    "setup-htlc": "ts-node scripts/setup-htlc.ts",
+    "monitor-swaps": "ts-node scripts/monitor-swaps.ts",
+    "test-swap": "ts-node scripts/test-swap.ts"
+  },
+  "dependencies": {
+    "ethers": "^6.0.0",
+    "stellar-sdk": "^11.0.0",
+    "dotenv": "^16.0.0",
+    "crypto": "^1.0.1",
+    "axios": "^1.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^4.9.0",
+    "ts-node": "^10.9.0",
+    "@types/node": "^18.0.0"
+  }
+} 
