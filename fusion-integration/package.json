@@ -1,51 +1,42 @@
 {
-  "name": "1inch-fusion-stellar-extension",
+  "name": "1sync-fusion-extension",
   "version": "1.0.0",
-  "description": "1inch Fusion+ Extension to Stellar - Hackathon Project",
-  "main": "index.js",
+  "description": "1Sync Fusion+ Extension - Cross-chain swaps between Ethereum and Stellar",
+  "main": "src/fusion-server.ts",
   "scripts": {
-    "start": "npm run start:fusion",
-    "start:fusion": "ts-node src/fusion-server.ts",
-    "start:ui": "cd ../frontend && npm start",
-    "dev": "concurrently \"npm run start:fusion\" \"npm run start:ui\"",
+    "start": "ts-node src/fusion-server.ts",
+    "dev": "ts-node-dev --respawn src/fusion-server.ts",
+    "demo": "node scripts/demo-1inch-fusion.js",
     "build": "tsc",
-    "test": "jest",
-    "deploy:fusion": "hardhat run scripts/deploy-fusion.ts --network sepolia",
-    "deploy:stellar": "ts-node scripts/deploy-stellar.ts",
-    "demo": "ts-node scripts/demo.ts"
+    "test": "jest"
   },
   "dependencies": {
-    "@1inch/fusion-sdk": "^1.0.0",
-    "@1inch/limit-order-protocol": "^4.0.0",
-    "@1inch/fusion-connect": "^1.0.0",
     "ethers": "^6.0.0",
-    "stellar-sdk": "^11.0.0",
     "express": "^4.18.0",
     "cors": "^2.8.5",
     "dotenv": "^16.0.0",
-    "axios": "^1.0.0",
-    "ws": "^8.0.0"
+    "axios": "^1.0.0"
   },
   "devDependencies": {
     "typescript": "^4.9.0",
     "ts-node": "^10.9.0",
+    "ts-node-dev": "^2.0.0",
     "@types/node": "^18.0.0",
     "@types/express": "^4.17.0",
     "@types/cors": "^2.8.0",
-    "jest": "^29.0.0",
     "@types/jest": "^29.0.0",
-    "hardhat": "^2.17.0",
-    "@nomicfoundation/hardhat-toolbox": "^3.0.0"
+    "jest": "^29.0.0"
   },
   "keywords": [
+    "1sync",
+    "fusion-plus",
     "1inch",
-    "fusion",
-    "stellar",
     "cross-chain",
     "swap",
-    "hackathon",
-    "blockchain"
+    "ethereum",
+    "stellar",
+    "htlc"
   ],
-  "author": "Your Team",
+  "author": "1Sync Team",
   "license": "MIT"
 } 
