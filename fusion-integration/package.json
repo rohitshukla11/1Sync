@@ -1,42 +1,41 @@
 {
   "name": "1sync-fusion-extension",
   "version": "1.0.0",
-  "description": "1Sync Fusion+ Extension - Cross-chain swaps between Ethereum and Stellar",
+  "description": "1inch Fusion+ Integration for 1Sync Cross-Chain Swaps",
   "main": "src/fusion-server.ts",
   "scripts": {
     "start": "ts-node src/fusion-server.ts",
-    "dev": "ts-node-dev --respawn src/fusion-server.ts",
-    "demo": "node scripts/demo-1inch-fusion.js",
     "build": "tsc",
+    "dev": "ts-node-dev src/fusion-server.ts",
     "test": "jest"
   },
   "dependencies": {
-    "ethers": "^6.0.0",
-    "express": "^4.18.0",
+    "@stellar/stellar-sdk": "^13.3.0",
+    "axios": "^1.6.0",
     "cors": "^2.8.5",
-    "dotenv": "^16.0.0",
-    "axios": "^1.0.0"
+    "dotenv": "^16.3.1",
+    "ethers": "^6.8.0",
+    "express": "^4.18.2",
+    "stellar-sdk": "^11.3.0"
   },
   "devDependencies": {
-    "typescript": "^4.9.0",
-    "ts-node": "^10.9.0",
+    "@types/cors": "^2.8.13",
+    "@types/express": "^4.17.17",
+    "@types/jest": "^29.5.4",
+    "@types/node": "^20.5.0",
+    "jest": "^29.6.2",
+    "ts-node": "^10.9.1",
     "ts-node-dev": "^2.0.0",
-    "@types/node": "^18.0.0",
-    "@types/express": "^4.17.0",
-    "@types/cors": "^2.8.0",
-    "@types/jest": "^29.0.0",
-    "jest": "^29.0.0"
+    "typescript": "^5.1.6"
   },
   "keywords": [
-    "1sync",
-    "fusion-plus",
     "1inch",
+    "fusion",
     "cross-chain",
-    "swap",
     "ethereum",
     "stellar",
-    "htlc"
+    "swap"
   ],
   "author": "1Sync Team",
   "license": "MIT"
-} 
+}

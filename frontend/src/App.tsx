@@ -1,10 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import SwapForm from './components/SwapForm';
-import Status from './components/Status';
-import FeeEstimate from './components/FeeEstimate';
-import SwapHistory from './components/SwapHistory';
+import axios from 'axios';
+import './App.css';
+import HashlockedSwapFlow from './components/HashlockedSwapFlow';
 
-// Type definitions
 interface SwapOrder {
   id: string;
   fromChain: string;
@@ -13,26 +11,16 @@ interface SwapOrder {
   toToken: string;
   fromAmount: string;
   toAmount: string;
-  status: 'initiated' | 'locked' | 'secret_revealed' | 'claimed' | 'refunded' | 'pending';
-  createdAt: Date;
-  expiresAt: Date;
-  swapId?: string;
-  claimableBalanceId?: string;
-  preimage?: string;
-  hashlock?: string;
-  timelock?: number;
-  txHash?: string;
-  claimTxHash?: string;
-  blockNumber?: number;
-  gasUsed?: number;
-  claimBlockNumber?: number;
-  claimGasUsed?: number;
-  stellarReceiverKey?: string;
-  ethereumReceiverAddress?: string;
-  secretRevealedAt?: Date;
-  claimedAt?: Date;
-  refundedAt?: Date;
-  lockedAt?: Date;
+  status: string;
+  createdAt: number;
+  expiresAt: number;
+  swapId: string;
+  hashlock: string;
+  timelock: number;
+  lockedAt?: number;
+  secretRevealedAt?: number;
+  claimedAt?: number;
+  refundedAt?: number;
 }
 
 interface Estimation {
@@ -42,370 +30,411 @@ interface Estimation {
   totalFeeUSD: string;
   exchangeRate: string;
   slippage: string;
+  mode?: string;
 }
 
-interface Tokens {
-  ethereum: string[];
-  stellar: string[];
-}
-
-interface ApiResponse<T> {
-  success: boolean;
-  data: T;
-  error?: string;
-  message?: string;
-}
-
-// API configuration
-const API_BASE_URL = 'http://localhost:5000/api/fusion';
-
-// API service functions
-const apiService = {
-  async get<T>(endpoint: string): Promise<T> {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`);
-    if (!response.ok) {
-      throw new Error(`API Error: ${response.statusText}`);
-    }
-    return response.json();
-  },
-
-  async post<T>(endpoint: string, data: any): Promise<T> {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data),
-    });
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || `API Error: ${response.statusText}`);
-    }
-    return response.json();
-  }
-};
-
-const SwapUI = () => {
-  const [fromChain, setFromChain] = useState<'ethereum' | 'stellar'>('ethereum');
-  const [toChain, setToChain] = useState<'ethereum' | 'stellar'>('stellar');
-  const [fromToken, setFromToken] = useState('USDC');
-  const [toToken, setToToken] = useState('USDC');
-  const [fromAmount, setFromAmount] = useState('');
-  const [toAmount, setToAmount] = useState('');
-  const [swapOrders, setSwapOrders] = useState<SwapOrder[]>([]);
-  const [tokens, setTokens] = useState<Tokens>({ ethereum: [], stellar: [] });
+function App() {
+  const [orders, setOrders] = useState<SwapOrder[]>([]);
   const [estimation, setEstimation] = useState<Estimation | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isSwapping, setIsSwapping] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [currentOrder, setCurrentOrder] = useState<SwapOrder | null>(null);
+  const [activeTab, setActiveTab] = useState<'legacy' | 'hashlocked'>('hashlocked');
 
-  // Load tokens on component mount
+  // Form state
+  const [formData, setFormData] = useState({
+    fromChain: 'ethereum',
+    toChain: 'stellar',
+    fromToken: '0x06129D77ae0D1044924c1F22f22Da92ea6Fd1bC2', // TEST token
+    toToken: 'USDC',
+    fromAmount: '1000000',
+    toAmount: '1000000',
+    fromAddress: '0x2060C92f8163Edd331877E398Ca44d3e82AdB834', // Demo address
+    toAddress: ''
+  });
+
+  const API_BASE = 'http://localhost:5000/api/fusion';
+
   useEffect(() => {
-    loadTokens();
-    loadSwapOrders();
+    loadOrders();
   }, []);
 
-  // Load available tokens
-  const loadTokens = async () => {
+  const loadOrders = async () => {
     try {
-      setIsLoading(true);
-      const response = await apiService.get<ApiResponse<Tokens>>('/tokens');
-      if (response.success) {
-        setTokens(response.data);
-      }
+      const response = await axios.get(`${API_BASE}/swaps`);
+      setOrders(response.data.data);
     } catch (error) {
-      console.error('Failed to load tokens:', error);
-      setError('Failed to load tokens');
-    } finally {
-      setIsLoading(false);
+      console.error('Error loading orders:', error);
     }
   };
 
-  // Load swap orders
-  const loadSwapOrders = async () => {
-    try {
-      const response = await apiService.get<ApiResponse<SwapOrder[]>>('/swaps');
-      if (response.success) {
-        const ordersWithDates = response.data.map(order => ({
-          ...order,
-          createdAt: new Date(order.createdAt),
-          expiresAt: new Date(order.expiresAt),
-          secretRevealedAt: order.secretRevealedAt ? new Date(order.secretRevealedAt) : undefined,
-          claimedAt: order.claimedAt ? new Date(order.claimedAt) : undefined,
-          refundedAt: order.refundedAt ? new Date(order.refundedAt) : undefined,
-          lockedAt: order.lockedAt ? new Date(order.lockedAt) : undefined,
-        }));
-        setSwapOrders(ordersWithDates);
-      }
-    } catch (error) {
-      console.error('Failed to load swap orders:', error);
-    }
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
   };
 
-  // Get estimation
   const getEstimation = async () => {
-    if (!fromAmount || parseFloat(fromAmount) <= 0) return;
-    
-    try {
-      const response = await apiService.post<ApiResponse<Estimation>>('/estimate', {
-        fromChain,
-        toChain,
-        amount: fromAmount
-      });
-      if (response.success) {
-        setEstimation(response.data);
-      }
-    } catch (error) {
-      console.error('Failed to get estimation:', error);
-    }
-  };
-
-  // Swap chains
-  const handleSwapChains = () => {
-    setFromChain(toChain);
-    setToChain(fromChain);
-    setFromToken(toToken);
-    setToToken(fromToken);
-    setFromAmount(toAmount);
-    setToAmount(fromAmount);
-  };
-
-  // Initiate swap
-  const handleInitiateSwap = async () => {
-    if (!fromAmount || parseFloat(fromAmount) <= 0) {
-      setError('Please enter a valid amount');
-      return;
-    }
-
-    setIsSwapping(true);
+    setLoading(true);
     setError(null);
-
     try {
-      // Use 1inch Fusion+ API for automated cross-chain swaps
-      const response = await apiService.post<ApiResponse<SwapOrder>>('/order', {
-        fromChain: fromChain,
-        toChain: toChain,
-        fromAsset: fromToken,
-        toAsset: toToken,
-        fromAmount: fromAmount,
-        toAmount: toAmount,
-        fromAddress: '0x2060C92f8163Edd331877E398Ca44d3e82AdB834', // Demo address
-        // toAddress: NOT PROVIDED - Will be auto-generated by Fusion+!
-        timelock: Math.floor(Date.now() / 1000) + 3600
+      const response = await axios.post(`${API_BASE}/estimate`, {
+        fromChain: formData.fromChain,
+        toChain: formData.toChain,
+        amount: formData.fromAmount,
+        fromTokenAddress: formData.fromToken,
+        toTokenAddress: formData.toToken
       });
-      
-      if (response.success) {
-        const newOrder = {
-          ...response.data,
-          createdAt: new Date(Number(response.data.createdAt) * 1000),
-          expiresAt: new Date(Number(response.data.expiresAt) * 1000)
-        };
-        setSwapOrders(prev => [newOrder, ...prev]);
-        setFromAmount('');
-        setToAmount('');
-        console.log('✅ 1inch Fusion+ order created successfully!');
-        console.log('🚀 No manual Stellar key input required!');
-      }
-    } catch (error) {
-      console.error('Error initiating 1inch Fusion+ swap:', error);
-      setError('Failed to initiate cross-chain swap');
+      setEstimation(response.data.data);
+    } catch (error: any) {
+      setError(error.response?.data?.error || 'Failed to get estimation');
     } finally {
-      setIsSwapping(false);
+      setLoading(false);
     }
   };
 
-  // Advance swap status (for demo purposes)
-  const advanceSwapStatus = async (swapId: string, status: SwapOrder['status']) => {
+  const createOrder = async () => {
+    setLoading(true);
+    setError(null);
     try {
-      const response = await apiService.post<ApiResponse<SwapOrder>>(`/demo/advance-swap/${swapId}`, {
-        status: status
-      });
-      
-      if (response.success) {
-        const updatedOrder = {
-          ...response.data,
-          createdAt: new Date(Number(response.data.createdAt)),
-          expiresAt: new Date(Number(response.data.expiresAt)),
-          secretRevealedAt: response.data.secretRevealedAt ? new Date(Number(response.data.secretRevealedAt)) : undefined,
-          claimedAt: response.data.claimedAt ? new Date(Number(response.data.claimedAt)) : undefined,
-          refundedAt: response.data.refundedAt ? new Date(Number(response.data.refundedAt)) : undefined,
-          lockedAt: response.data.lockedAt ? new Date(Number(response.data.lockedAt)) : undefined,
-        };
-        
-        setSwapOrders(prev => 
-          prev.map(order => 
-            order.id === swapId ? updatedOrder : order
-          )
-        );
-        
-        console.log(`✅ Swap status advanced to: ${status}`);
-      }
+      const response = await axios.post(`${API_BASE}/order`, formData);
+      console.log('Order created:', response.data);
+      await loadOrders();
+      setFormData(prev => ({ ...prev, toAddress: '' }));
+    } catch (error: any) {
+      setError(error.response?.data?.error || 'Failed to create order');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const advanceSwap = async (swapId: string, status: string) => {
+    try {
+      await axios.post(`${API_BASE}/demo/advance-swap/${swapId}`, { status });
+      await loadOrders();
     } catch (error) {
-      console.error('Error advancing swap status:', error);
-      setError('Failed to advance swap status');
+      console.error('Error advancing swap:', error);
     }
   };
 
-  // Complete swap
   const completeSwap = async (swapId: string) => {
-    setIsSwapping(true);
     try {
-      const response = await apiService.post<ApiResponse<SwapOrder>>(`/demo/complete-swap/${swapId}`, {});
-      
-      if (response.success) {
-        const completedOrder = {
-          ...response.data,
-          createdAt: new Date(Number(response.data.createdAt)),
-          expiresAt: new Date(Number(response.data.expiresAt)),
-          secretRevealedAt: response.data.secretRevealedAt ? new Date(Number(response.data.secretRevealedAt)) : undefined,
-          claimedAt: response.data.claimedAt ? new Date(Number(response.data.claimedAt)) : undefined,
-          refundedAt: response.data.refundedAt ? new Date(Number(response.data.refundedAt)) : undefined,
-          lockedAt: response.data.lockedAt ? new Date(Number(response.data.lockedAt)) : undefined,
-        };
-        
-        setSwapOrders(prev => 
-          prev.map(order => 
-            order.id === swapId ? completedOrder : order
-          )
-        );
-        
-        console.log('✅ Swap completed successfully!');
-      }
+      await axios.post(`${API_BASE}/demo/complete-swap/${swapId}`);
+      await loadOrders();
     } catch (error) {
       console.error('Error completing swap:', error);
-      setError('Failed to complete swap');
-    } finally {
-      setIsSwapping(false);
     }
-  };
-
-  // Refresh orders
-  const refreshOrders = () => {
-    loadSwapOrders();
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">1Sync</h1>
-          <p className="text-lg text-gray-600">
-            1inch Fusion+ Extension for Cross-Chain Swaps (Ethereum ↔ Stellar)
-          </p>
-          <div className="flex justify-center space-x-4 mt-4 text-sm text-gray-500">
-            <span>🌐 Ethereum (Sepolia)</span>
-            <span>⭐ Stellar (Testnet)</span>
-            <span>🔗 Hashlock & Timelock</span>
-            <span>⚡ Partial Fills</span>
+    <div className="min-h-screen bg-gray-100">
+      <div className="bg-white shadow-sm border-b">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center py-6">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">1Sync</h1>
+              <p className="text-gray-600">Cross-Chain Atomic Swaps</p>
+            </div>
+            <div className="flex space-x-4">
+              <button
+                onClick={() => setActiveTab('hashlocked')}
+                className={`px-4 py-2 rounded-md font-medium ${
+                  activeTab === 'hashlocked'
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+              >
+                🔒 Hashlocked Flow
+              </button>
+              <button
+                onClick={() => setActiveTab('legacy')}
+                className={`px-4 py-2 rounded-md font-medium ${
+                  activeTab === 'legacy'
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+              >
+                🔄 Legacy Flow
+              </button>
+            </div>
+          </div>
           </div>
         </div>
 
+      {activeTab === 'hashlocked' ? (
+        <HashlockedSwapFlow />
+      ) : (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Left Column - Swap Form */}
-          <div className="space-y-6">
-            {/* Swap Form */}
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">🔄 Create Cross-Chain Swap</h2>
+            {/* Create Order Form */}
+            <div className="bg-white rounded-lg shadow p-6">
+              <h2 className="text-2xl font-bold text-gray-900 mb-6">Create Cross-Chain Swap</h2>
               
-              <SwapForm
-                fromChain={fromChain}
-                toChain={toChain}
-                fromToken={fromToken}
-                toToken={toToken}
-                fromAmount={fromAmount}
-                toAmount={toAmount}
-                tokens={tokens}
-                estimation={estimation}
-                isSwapping={isSwapping}
-                onFromChainChange={setFromChain}
-                onToChainChange={setToChain}
-                onFromTokenChange={setFromToken}
-                onToTokenChange={setToToken}
-                onFromAmountChange={setFromAmount}
-                onToAmountChange={setToAmount}
-                onSwapChains={handleSwapChains}
-                onInitiateSwap={handleInitiateSwap}
-              />
-
-              {/* Fee Estimate */}
-              <FeeEstimate
-                fromChain={fromChain}
-                toChain={toChain}
-                fromAmount={fromAmount}
-                toAmount={toAmount}
-                fromToken={fromToken}
-                toToken={toToken}
-                onEstimate={setEstimation}
-              />
-
-              {/* Error Display */}
               {error && (
-                <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-                  <p className="text-red-700 text-sm">{error}</p>
+                <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+                  {error}
                 </div>
               )}
 
-              {/* Initiate Swap Button */}
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      From Chain
+                    </label>
+                    <select
+                      name="fromChain"
+                      value={formData.fromChain}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="ethereum">Ethereum</option>
+                      <option value="stellar">Stellar</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      To Chain
+                    </label>
+                    <select
+                      name="toChain"
+                      value={formData.toChain}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="stellar">Stellar</option>
+                      <option value="ethereum">Ethereum</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      From Token
+                    </label>
+                    <input
+                      type="text"
+                      name="fromToken"
+                      value={formData.fromToken}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Token address or symbol"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      To Token
+                    </label>
+                    <input
+                      type="text"
+                      name="toToken"
+                      value={formData.toToken}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Token address or symbol"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      From Amount
+                    </label>
+                    <input
+                      type="text"
+                      name="fromAmount"
+                      value={formData.fromAmount}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Amount to send"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      To Amount
+                    </label>
+                    <input
+                      type="text"
+                      name="toAmount"
+                      value={formData.toAmount}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Amount to receive"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    From Address
+                  </label>
+                  <input
+                    type="text"
+                    name="fromAddress"
+                    value={formData.fromAddress}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Your address"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    To Address (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    name="toAddress"
+                    value={formData.toAddress}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Recipient address (auto-generated if empty)"
+                  />
+                </div>
+
+                <div className="flex space-x-4">
+                  <button
+                    onClick={getEstimation}
+                    disabled={loading}
+                    className="flex-1 px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 disabled:bg-gray-400"
+                  >
+                    {loading ? 'Getting Estimation...' : 'Get Estimation'}
+                  </button>
               <button
-                onClick={handleInitiateSwap}
-                disabled={isSwapping || !fromAmount || parseFloat(fromAmount) <= 0}
-                className="w-full mt-4 bg-blue-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                {isSwapping ? 'Creating Swap...' : '🚀 Initiate Cross-Chain Swap'}
+                    onClick={createOrder}
+                    disabled={loading}
+                    className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:bg-gray-400"
+                  >
+                    {loading ? 'Creating...' : 'Create Order'}
               </button>
             </div>
+              </div>
 
-            {/* Current Order Details */}
-            {currentOrder && (
-              <div className="bg-white rounded-lg shadow-md p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">📋 Current Swap Details</h3>
-                <Status
-                  order={currentOrder}
-                  onAdvanceStatus={advanceSwapStatus}
-                  onCompleteSwap={completeSwap}
-                  isSwapping={isSwapping}
-                />
+              {/* Estimation Display */}
+              {estimation && (
+                <div className="mt-6 p-4 bg-blue-50 rounded-lg">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Fee Estimation</h3>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <strong>Estimated Time:</strong> {estimation.estimatedTime / 60} minutes
+                    </div>
+                    <div>
+                      <strong>Ethereum Gas Fee:</strong> {estimation.ethereumGasFee} ETH
+                    </div>
+                    <div>
+                      <strong>Stellar Fee:</strong> {estimation.stellarFee} XLM
+                    </div>
+                    <div>
+                      <strong>Total Fee (USD):</strong> ${estimation.totalFeeUSD}
+                    </div>
+                    <div>
+                      <strong>Exchange Rate:</strong> {estimation.exchangeRate}
+                    </div>
+                    <div>
+                      <strong>Slippage:</strong> {estimation.slippage}
+                    </div>
+                    {estimation.mode && (
+                      <div className="col-span-2">
+                        <strong>Mode:</strong> {estimation.mode}
+                      </div>
+                    )}
+                  </div>
               </div>
             )}
           </div>
 
-          {/* Right Column - Swap History */}
-          <div className="space-y-6">
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <SwapHistory
-                swaps={swapOrders}
-                onAdvanceStatus={advanceSwapStatus}
-                onCompleteSwap={completeSwap}
-                isSwapping={isSwapping}
-              />
+            {/* Orders List */}
+            <div className="bg-white rounded-lg shadow p-6">
+              <h2 className="text-2xl font-bold text-gray-900 mb-6">Recent Orders</h2>
+              
+              <div className="space-y-4">
+                {orders.map((order) => (
+                  <div key={order.id} className="border rounded-lg p-4">
+                    <div className="flex justify-between items-start mb-3">
+                      <div>
+                        <h3 className="font-semibold text-gray-900">
+                          {order.fromAmount} {order.fromToken} → {order.toAmount} {order.toToken}
+                        </h3>
+                        <p className="text-sm text-gray-600">
+                          {order.fromChain} → {order.toChain}
+                        </p>
+                      </div>
+                      <span className={`px-2 py-1 rounded text-xs font-medium ${
+                        order.status === 'claimed' ? 'bg-green-100 text-green-800' :
+                        order.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                        'bg-yellow-100 text-yellow-800'
+                      }`}>
+                        {order.status}
+                      </span>
+                    </div>
+                    
+                    <div className="text-xs text-gray-500 space-y-1">
+                      <div>Order ID: {order.swapId}</div>
+                      <div>Hashlock: {order.hashlock}</div>
+                      <div>Created: {new Date(order.createdAt).toLocaleString()}</div>
+                      <div>Expires: {new Date(order.expiresAt).toLocaleString()}</div>
+                    </div>
+
+                    <div className="mt-3 flex space-x-2">
+                      {order.status === 'initiated' && (
+                        <>
+                          <button
+                            onClick={() => advanceSwap(order.id, 'locked')}
+                            className="px-3 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600"
+                          >
+                            Lock
+                          </button>
+                          <button
+                            onClick={() => advanceSwap(order.id, 'cancelled')}
+                            className="px-3 py-1 bg-red-500 text-white rounded text-xs hover:bg-red-600"
+                          >
+                            Cancel
+                          </button>
+                        </>
+                      )}
+                      {order.status === 'locked' && (
+                        <>
+                          <button
+                            onClick={() => advanceSwap(order.id, 'secret_revealed')}
+                            className="px-3 py-1 bg-green-500 text-white rounded text-xs hover:bg-green-600"
+                          >
+                            Reveal Secret
+                          </button>
+                          <button
+                            onClick={() => advanceSwap(order.id, 'refunded')}
+                            className="px-3 py-1 bg-red-500 text-white rounded text-xs hover:bg-red-600"
+                          >
+                            Refund
+                          </button>
+                        </>
+                      )}
+                      {order.status === 'secret_revealed' && (
+                        <button
+                          onClick={() => completeSwap(order.id)}
+                          className="px-3 py-1 bg-green-500 text-white rounded text-xs hover:bg-green-600"
+                        >
+                          Complete Swap
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                
+                {orders.length === 0 && (
+                  <div className="text-center text-gray-500 py-8">
+                    No orders yet. Create your first cross-chain swap!
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
-
-        {/* Footer */}
-        <div className="mt-12 text-center text-sm text-gray-500">
-          <p>🔒 Trustless Cross-Chain Swaps powered by 1inch Fusion+ and HTLC</p>
-          <p className="mt-1">
-            <span className="text-blue-600">Ethereum HTLC Contract:</span>{' '}
-            <a 
-              href="https://sepolia.etherscan.io/address/0xf7A9B1F6DC412655e5E6358A4695a1B25CEd8c8a"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-600 hover:underline"
-            >
-              0xf7A9B1F6DC412655e5E6358A4695a1B25CEd8c8a
-            </a>
-          </p>
-        </div>
-      </div>
+      )}
     </div>
   );
-};
-
-function App() {
-  return <SwapUI />;
 }
 
 export default App; 
