@@ -1,0 +1,62 @@
+{
+  "name": "1sync",
+  "version": "1.0.0",
+  "description": "1Sync - Cross-chain swap between Ethereum and Stellar using HTLCs",
+  "main": "index.js",
+  "scripts": {
+    "setup-all": "npm run setup-frontend && npm run setup-backend && npm run setup-contracts",
+    "setup-frontend": "cd frontend && npm install",
+    "setup-backend": "cd relayer && npm install",
+    "setup-contracts": "cd contracts && npm install",
+    "start": "concurrently \"npm run start-backend\" \"npm run start-frontend\"",
+    "start-backend": "cd relayer && npm start",
+    "start-frontend": "cd frontend && npm start",
+    "dev": "concurrently \"npm run dev-backend\" \"npm run dev-frontend\"",
+    "dev-backend": "cd relayer && npm run dev",
+    "dev-frontend": "cd frontend && npm start",
+    "build": "npm run build-backend && npm run build-frontend",
+    "build-backend": "cd relayer && npm run build",
+    "build-frontend": "cd frontend && npm run build",
+    "deploy:infura": "node deploy-with-infura.js",
+    "deploy:sepolia": "cd contracts && npm run deploy:sepolia",
+    "deploy:goerli": "cd contracts && npm run deploy:goerli",
+    "deploy:local": "cd contracts && npm run deploy:local",
+    "compile": "cd contracts && npm run compile",
+    "clean": "rm -rf node_modules frontend/node_modules relayer/node_modules contracts/node_modules",
+    "clean-install": "npm run clean && npm run setup-all",
+    "demo:start-servers": "node scripts/start-servers.js",
+    "demo:fusion": "node scripts/demo-1inch-fusion.js",
+    "demo:relayer": "node scripts/demo-relayer.js",
+    "demo:full-system": "node scripts/demo-full-system.js",
+    "demo:all": "npm run demo:start-servers & sleep 10 && npm run demo:full-system",
+    "test:real-swaps": "node scripts/test-real-swaps.js"
+  },
+  "keywords": [
+    "1sync",
+    "blockchain",
+    "cross-chain",
+    "swap",
+    "ethereum",
+    "stellar",
+    "htlc",
+    "atomic-swap",
+    "1inch-fusion"
+  ],
+  "author": "1Sync Team",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^7.6.0"
+  },
+  "workspaces": [
+    "frontend",
+    "relayer",
+    "contracts"
+  ],
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  },
+  "dependencies": {
+    "nodemon": "^3.1.10"
+  }
+}
