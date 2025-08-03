@@ -7,7 +7,10 @@
     "compile": "hardhat compile",
     "test": "hardhat test",
     "deploy:ethereum": "hardhat run scripts/deploy.js --network",
-    "deploy:stellar": "cd stellar && cargo build --target wasm32-unknown-unknown --release"
+    "deploy:stellar": "cd stellar && cargo build --target wasm32-unknown-unknown --release",
+    "interact:ethereum": "hardhat run scripts/interact.js --network sepolia",
+    "interact:stellar": "node scripts/stellar-interact.js",
+    "test:deployed": "npm run interact:ethereum && npm run interact:stellar"
   },
   "keywords": [
     "htlc",

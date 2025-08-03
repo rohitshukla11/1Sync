@@ -1,0 +1,45 @@
+{
+  "ethereum": {
+    "sepolia": {
+      "htlc": "0x99E4a9561049120CD7421243fAE91EdeC3088342",
+      "explorer": "https://sepolia.etherscan.io/address/0x99E4a9561049120CD7421243fAE91EdeC3088342"
+    },
+    "mainnet": {
+      "htlc": "",
+      "explorer": ""
+    }
+  },
+  "stellar": {
+    "testnet": {
+      "htlc": "CASNK3LPFKWQQR6DCKC6SNLFNNC7UDO3CQW5RVNSO5BG6PMZMVY7I2QG",
+      "hello_world": "CBY2NUYY6GWFESVBEEIBLMSGRGJOEXGDN3R2JJ2GTRKCGUPBST4GRSY2",
+      "explorer": "https://stellar.expert/explorer/testnet/contract/CASNK3LPFKWQQR6DCKC6SNLFNNC7UDO3CQW5RVNSO5BG6PMZMVY7I2QG"
+    },
+    "mainnet": {
+      "htlc": "",
+      "explorer": ""
+    }
+  },
+  "networks": {
+    "ethereum": {
+      "sepolia": {
+        "rpc": "https://sepolia.infura.io/v3/9141b17c03cd41009ba4ca480441e501",
+        "chainId": 11155111
+      },
+      "mainnet": {
+        "rpc": "",
+        "chainId": 1
+      }
+    },
+    "stellar": {
+      "testnet": {
+        "rpc": "https://soroban-testnet.stellar.org",
+        "networkPassphrase": "Test SDF Network ; September 2015"
+      },
+      "mainnet": {
+        "rpc": "https://soroban-mainnet.stellar.org",
+        "networkPassphrase": "Public Global Stellar Network ; September 2015"
+      }
+    }
+  }
+} 
