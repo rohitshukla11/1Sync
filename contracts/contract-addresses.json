@@ -2,10 +2,12 @@
   "ethereum": {
     "sepolia": {
       "htlc": "0x99E4a9561049120CD7421243fAE91EdeC3088342",
+      "mockERC20": "0xfCD06AA4b7f66B30d319d767249Bfbb3dcCe7EF0",
       "explorer": "https://sepolia.etherscan.io/address/0x99E4a9561049120CD7421243fAE91EdeC3088342"
     },
     "mainnet": {
       "htlc": "",
+      "mockERC20": "",
       "explorer": ""
     }
   },

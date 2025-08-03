@@ -2,6 +2,17 @@
 
 This repository contains Hash Time-Locked Contract (HTLC) implementations for cross-chain atomic swaps between Ethereum and Stellar networks.
 
+## 🚀 Deployed Contracts
+
+### Ethereum (Sepolia Testnet)
+- **HTLC Contract**: `0x99E4a9561049120CD7421243fAE91EdeC3088342`
+- **Explorer**: https://sepolia.etherscan.io/address/0x99E4a9561049120CD7421243fAE91EdeC3088342
+
+### Stellar (Testnet)
+- **HTLC Contract**: `CASNK3LPFKWQQR6DCKC6SNLFNNC7UDO3CQW5RVNSO5BG6PMZMVY7I2QG`
+- **HelloWorld Contract**: `CBY2NUYY6GWFESVBEEIBLMSGRGJOEXGDN3R2JJ2GTRKCGUPBST4GRSY2`
+- **Explorer**: https://stellar.expert/explorer/testnet/contract/CASNK3LPFKWQQR6DCKC6SNLFNNC7UDO3CQW5RVNSO5BG6PMZMVY7I2QG
+
 ## Directory Structure
 
 ```
@@ -11,8 +22,10 @@ contracts/
 │   └── MockERC20.sol         # Mock ERC20 token for testing
 ├── src/                      # Stellar/Rust contracts
 │   └── lib.rs                # Main Stellar HTLC contract
-├── scripts/                  # Deployment scripts
-│   └── deploy.js             # Ethereum deployment script
+├── scripts/                  # Deployment & interaction scripts
+│   ├── deploy.js             # Ethereum deployment script
+│   ├── interact.js           # Ethereum contract interaction
+│   └── stellar-interact.js   # Stellar contract interaction
 ├── test/                     # Test files
 │   └── HTLC.test.js          # Ethereum contract tests
 ├── .stellar/                 # Stellar configuration
@@ -25,7 +38,8 @@ contracts/
 ├── Cargo.lock                # Rust lock file
 ├── package.json              # Node.js dependencies
 ├── hardhat.config.js         # Hardhat configuration
-└── DEPLOYMENT_SUCCESS.md     # Deployment documentation
+├── contract-addresses.json   # Deployed contract addresses
+└── README.md                 # This file
 ```
 
 ## Ethereum Contracts
@@ -109,6 +123,11 @@ npm test
 npm run deploy:ethereum -- sepolia
 ```
 
+4. **Interact with deployed contract:**
+```bash
+npm run interact:ethereum
+```
+
 ### Stellar Development
 
 1. **Build contract:**
@@ -125,10 +144,23 @@ stellar contract deploy \
   --alias htlc
 ```
 
+3. **Interact with deployed contract:**
+```bash
+npm run interact:stellar
+```
+
 ## Contract Interaction
 
-### Ethereum
+### Ethereum (Using Deployed Contract)
 ```javascript
+// Load contract addresses
+const contractAddresses = require('./contract-addresses.json');
+const ethereumHTLCAddress = contractAddresses.ethereum.sepolia.htlc;
+
+// Get contract instance
+const HTLC = await ethers.getContractFactory("HTLC");
+const htlc = HTLC.attach(ethereumHTLCAddress);
+
 // Initiate swap
 const swapId = await htlc.initiateSwap(
   participant,
@@ -148,7 +180,7 @@ await htlc.withdraw(swapId, preimage);
 await htlc.refund(swapId);
 ```
 
-### Stellar
+### Stellar (Using Deployed Contract)
 ```bash
 # Initiate swap
 stellar contract invoke --id htlc --source alice --network testnet --send=yes \
@@ -172,6 +204,23 @@ stellar contract invoke --id htlc --source participant --network testnet --send=
 stellar contract invoke --id htlc --source initiator --network testnet --send=yes \
   -- refund \
   --swap_id <swap_id>
+```
+
+## Testing Deployed Contracts
+
+### Run All Tests
+```bash
+npm run test:deployed
+```
+
+### Test Ethereum Contract Only
+```bash
+npm run interact:ethereum
+```
+
+### Test Stellar Contract Only
+```bash
+npm run interact:stellar
 ```
 
 ## Security Features
@@ -201,6 +250,11 @@ npm test
 ### Stellar Tests
 ```bash
 cargo test
+```
+
+### Deployed Contract Tests
+```bash
+npm run test:deployed
 ```
 
 ## Deployment

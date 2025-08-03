@@ -1,160 +1,172 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.19;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-
-contract HTLC is ReentrancyGuard {
-    using ECDSA for bytes32;
-
+/**
+ * @title HTLC (Hash Time-Locked Contract)
+ * @dev A contract for atomic swaps between Ethereum and other blockchains
+ * @author 1Sync Cross-Chain Atomic Swap System
+ */
+contract HTLC {
     struct Swap {
-        address initiator;
-        address participant;
-        address token;
+        address payable recipient;
         uint256 amount;
         bytes32 hashlock;
         uint256 timelock;
         bool withdrawn;
         bool refunded;
-        string stellarDestination;
-        string stellarAmount;
-        string stellarAsset;
+        bytes32 preimage;
     }
 
     mapping(bytes32 => Swap) public swaps;
-    mapping(address => uint256) public nonces;
-
-    event SwapInitiated(
-        bytes32 indexed swapId,
-        address indexed initiator,
-        address indexed participant,
-        address token,
+    
+    event HTLCNew(
+        bytes32 indexed contractId,
+        address indexed sender,
+        address indexed recipient,
         uint256 amount,
         bytes32 hashlock,
-        uint256 timelock,
-        string stellarDestination,
-        string stellarAmount,
-        string stellarAsset
+        uint256 timelock
     );
+    
+    event HTLCWithdraw(bytes32 indexed contractId, bytes32 preimage);
+    event HTLCRefund(bytes32 indexed contractId);
 
-    event SwapWithdrawn(bytes32 indexed swapId, bytes preimage);
-    event SwapRefunded(bytes32 indexed swapId);
+    /**
+     * @dev Create a new HTLC contract
+     * @param _recipient The recipient of the funds
+     * @param _hashlock The hash of the preimage
+     * @param _timelock The timestamp when the contract expires
+     * @return contractId The ID of the created contract
+     */
+    function newContract(
+        address payable _recipient,
+        bytes32 _hashlock,
+        uint256 _timelock
+    ) external payable returns (bytes32 contractId) {
+        require(_recipient != address(0), "Invalid recipient");
+        require(_timelock > block.timestamp, "Timelock must be in the future");
+        require(msg.value > 0, "Amount must be greater than 0");
 
-    modifier onlyParticipant(bytes32 swapId) {
-        require(swaps[swapId].participant == msg.sender, "Not swap participant");
-        _;
-    }
-
-    modifier onlyInitiator(bytes32 swapId) {
-        require(swaps[swapId].initiator == msg.sender, "Not swap initiator");
-        _;
-    }
-
-    function initiateSwap(
-        address participant,
-        address token,
-        uint256 amount,
-        bytes32 hashlock,
-        uint256 timelock,
-        string memory stellarDestination,
-        string memory stellarAmount,
-        string memory stellarAsset
-    ) external nonReentrant returns (bytes32) {
-        require(amount > 0, "Amount must be greater than 0");
-        require(timelock > block.timestamp + 10 minutes, "Timelock too short");
-        require(timelock < block.timestamp + 24 hours, "Timelock too long");
-
-        uint256 nonce = nonces[msg.sender]++;
-        
-        bytes32 swapId = keccak256(
+        contractId = keccak256(
             abi.encodePacked(
                 msg.sender,
-                participant,
-                token,
-                amount,
-                hashlock,
-                timelock,
-                nonce
+                _recipient,
+                msg.value,
+                _hashlock,
+                _timelock
             )
         );
 
-        require(swaps[swapId].initiator == address(0), "Swap already exists");
+        // Ensure the contract doesn't already exist
+        require(swaps[contractId].recipient == address(0), "Contract already exists");
 
-        swaps[swapId] = Swap({
-            initiator: msg.sender,
-            participant: participant,
-            token: token,
-            amount: amount,
-            hashlock: hashlock,
-            timelock: timelock,
-            withdrawn: false,
-            refunded: false,
-            stellarDestination: stellarDestination,
-            stellarAmount: stellarAmount,
-            stellarAsset: stellarAsset
-        });
-
-        IERC20(token).transferFrom(msg.sender, address(this), amount);
-
-        emit SwapInitiated(
-            swapId,
-            msg.sender,
-            participant,
-            token,
-            amount,
-            hashlock,
-            timelock,
-            stellarDestination,
-            stellarAmount,
-            stellarAsset
+        swaps[contractId] = Swap(
+            _recipient,
+            msg.value,
+            _hashlock,
+            _timelock,
+            false,
+            false,
+            0x0
         );
 
-        return swapId;
+        emit HTLCNew(
+            contractId,
+            msg.sender,
+            _recipient,
+            msg.value,
+            _hashlock,
+            _timelock
+        );
     }
 
-    function withdraw(bytes32 swapId, bytes memory preimage) 
-        external 
-        onlyParticipant(swapId) 
-        nonReentrant 
-    {
-        Swap storage swap = swaps[swapId];
+    /**
+     * @dev Withdraw funds from the HTLC contract using the preimage
+     * @param _contractId The ID of the contract
+     * @param _preimage The preimage that hashes to the hashlock
+     */
+    function withdraw(bytes32 _contractId, bytes32 _preimage) external {
+        Swap storage swap = swaps[_contractId];
         
+        require(swap.recipient != address(0), "Contract does not exist");
         require(!swap.withdrawn, "Already withdrawn");
         require(!swap.refunded, "Already refunded");
+        require(swap.hashlock == keccak256(abi.encodePacked(_preimage)), "Incorrect preimage");
         require(block.timestamp < swap.timelock, "Timelock expired");
-        require(keccak256(preimage) == swap.hashlock, "Invalid preimage");
+        require(msg.sender == swap.recipient, "Only recipient can withdraw");
 
         swap.withdrawn = true;
-        
-        IERC20(swap.token).transfer(swap.participant, swap.amount);
+        swap.preimage = _preimage;
 
-        emit SwapWithdrawn(swapId, preimage);
+        emit HTLCWithdraw(_contractId, _preimage);
+
+        swap.recipient.transfer(swap.amount);
     }
 
-    function refund(bytes32 swapId) 
-        external 
-        onlyInitiator(swapId) 
-        nonReentrant 
-    {
-        Swap storage swap = swaps[swapId];
+    /**
+     * @dev Refund the sender if the timelock has expired
+     * @param _contractId The ID of the contract
+     */
+    function refund(bytes32 _contractId) external {
+        Swap storage swap = swaps[_contractId];
         
+        require(swap.recipient != address(0), "Contract does not exist");
         require(!swap.withdrawn, "Already withdrawn");
         require(!swap.refunded, "Already refunded");
         require(block.timestamp >= swap.timelock, "Timelock not expired");
 
         swap.refunded = true;
-        
-        IERC20(swap.token).transfer(swap.initiator, swap.amount);
 
-        emit SwapRefunded(swapId);
+        emit HTLCRefund(_contractId);
+
+        payable(msg.sender).transfer(swap.amount);
     }
 
-    function getSwap(bytes32 swapId) external view returns (Swap memory) {
-        return swaps[swapId];
+    /**
+     * @dev Get contract details
+     * @param _contractId The ID of the contract
+     * @return recipient The recipient address
+     * @return amount The amount of ETH
+     * @return hashlock The hashlock
+     * @return timelock The timelock timestamp
+     * @return withdrawn Whether the contract has been withdrawn
+     * @return refunded Whether the contract has been refunded
+     */
+    function getContract(bytes32 _contractId) external view returns (
+        address recipient,
+        uint256 amount,
+        bytes32 hashlock,
+        uint256 timelock,
+        bool withdrawn,
+        bool refunded
+    ) {
+        Swap storage swap = swaps[_contractId];
+        return (
+            swap.recipient,
+            swap.amount,
+            swap.hashlock,
+            swap.timelock,
+            swap.withdrawn,
+            swap.refunded
+        );
     }
 
-    function swapExists(bytes32 swapId) external view returns (bool) {
-        return swaps[swapId].initiator != address(0);
+    /**
+     * @dev Check if a contract exists
+     * @param _contractId The ID of the contract
+     * @return True if the contract exists
+     */
+    function contractExists(bytes32 _contractId) external view returns (bool) {
+        return swaps[_contractId].recipient != address(0);
+    }
+
+    /**
+     * @dev Get the preimage for a withdrawn contract
+     * @param _contractId The ID of the contract
+     * @return The preimage if the contract has been withdrawn
+     */
+    function getPreimage(bytes32 _contractId) external view returns (bytes32) {
+        require(swaps[_contractId].withdrawn, "Contract not withdrawn");
+        return swaps[_contractId].preimage;
     }
 } 

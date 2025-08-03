@@ -19,7 +19,10 @@ async function main() {
   console.log(`   Stellar HTLC: ${stellarHTLCAddress}\n`);
 
   // Get signers
-  const [deployer, participant] = await hre.ethers.getSigners();
+  const signers = await hre.ethers.getSigners();
+  const deployer = signers[0];
+  const participant = signers[1] || signers[0]; // Use deployer as participant if only one signer
+
   console.log("👤 Signers:");
   console.log(`   Deployer: ${deployer.address}`);
   console.log(`   Participant: ${participant.address}\n`);
@@ -87,11 +90,15 @@ async function main() {
   console.log(`     Stellar Amount: ${swap.stellarAmount}`);
   console.log(`     Stellar Asset: ${swap.stellarAsset}\n`);
 
-  // Test withdrawal
-  console.log("💸 Testing withdrawal...");
-  const withdrawTx = await htlc.connect(participant).withdraw(swapId, preimage);
-  await withdrawTx.wait();
-  console.log(`   ✅ Withdrawal successful: ${withdrawTx.hash}\n`);
+  // Test withdrawal (if participant is different from deployer)
+  if (participant.address !== deployer.address) {
+    console.log("💸 Testing withdrawal...");
+    const withdrawTx = await htlc.connect(participant).withdraw(swapId, preimage);
+    await withdrawTx.wait();
+    console.log(`   ✅ Withdrawal successful: ${withdrawTx.hash}\n`);
+  } else {
+    console.log("💸 Skipping withdrawal test (same signer)\n");
+  }
 
   // Verify final state
   console.log("🔍 Verifying final state...");
